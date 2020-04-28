@@ -4,6 +4,9 @@ import pickle
 import xml.etree.ElementTree as xml
 from enum import Enum
 import struct
+import time
+import random
+import uuid
 
 
 class SerializationType(Enum):
@@ -20,10 +23,32 @@ def build_message(serialization, operation, topic, content, timestamp=None):
             "content": content}
 
 
+def build_message_between_brokers(operation, clock, content, broker_id, message_id=None):
+    return {"operation": operation,
+            "clock": clock,
+            "content": content,
+            "broker_id": broker_id,
+            "message_id": str(uuid.uuid4()) if message_id is None else message_id}
+
+
 def send_message_packed_with_size(socket, message_bytes):
     message_size = len(message_bytes)
     socket.sendall(struct.pack('!I', message_size))
     socket.sendall(message_bytes)
+
+
+def send_message_packed_with_size_to_another_broker(broker, message_bytes, mu=0.1):
+    message_size = len(message_bytes)
+    sigma = 0.1 * mu
+    time.sleep(random.gauss(mu, sigma))  # Simulates latency effect
+    socket = broker.outgoing_conn
+    socket.sendall(struct.pack('!I', message_size))
+    socket.sendall(message_bytes)
+
+
+def send_to_all_brokers(brokers, message_bytes):
+    for broker in brokers:
+        send_message_packed_with_size_to_another_broker(broker, message_bytes)
 
 
 def unpack_and_receive_message_bytes(socket):

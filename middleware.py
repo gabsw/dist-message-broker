@@ -5,12 +5,13 @@ from utils import build_message, general_encode, general_decode, SerializationTy
     unpack_and_receive_message_bytes, ConnectionClosedError
 
 HOST = 'localhost'
-PORT = 8000
+PORT = 8100
 
 
 class MiddlewareType(Enum):
     CONSUMER = 1
     PRODUCER = 2
+    BROKER = 3
 
 
 class OperationType(Enum):
@@ -18,6 +19,10 @@ class OperationType(Enum):
     SUBSCRIBE = "subscribe"
     LIST = "list"
     CANCEL = "cancel"
+    GREETING = "greeting"
+    ALLOW = "allow"
+    ENTER = "enter"
+    RELEASE = "release"
 
 
 class Queue:
@@ -160,3 +165,10 @@ class PickleQueue(Queue):
 
     def __str__(self):
         return f'PickleQueue({self.topic})'
+
+
+class ExternalBroker:
+    def __init__(self, outgoing_conn, id):
+        self.outgoing_conn = outgoing_conn
+        self.id = id
+        self.greetings_ack = False
