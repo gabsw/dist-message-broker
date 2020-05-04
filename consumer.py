@@ -5,9 +5,9 @@ import middleware
 
 
 class Consumer:
-    def __init__(self, datatype):
+    def __init__(self, datatype,port):
         self.type = datatype
-        self.queue = middleware.PickleQueue(f"/{self.type}", type=middleware.MiddlewareType.CONSUMER)
+        self.queue = middleware.PickleQueue(port,f"/{self.type}", type=middleware.MiddlewareType.CONSUMER)
 
     @classmethod
     def datatypes(self):

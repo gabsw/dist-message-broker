@@ -26,10 +26,10 @@ class OperationType(Enum):
 
 
 class Queue:
-    def __init__(self, serialization_type, topic, type=MiddlewareType.CONSUMER):
+    def __init__(self, port,serialization_type, topic, type=MiddlewareType.CONSUMER):
         self.topic = topic
         self.queue_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.queue_socket.connect((HOST, PORT))
+        self.queue_socket.connect((HOST, port))
         self.subscribed = False
         self.type = type
         self.serialization_type = serialization_type
@@ -87,8 +87,8 @@ class Queue:
 
 
 class JSONQueue(Queue):
-    def __init__(self, topic, type=MiddlewareType.CONSUMER):
-        super().__init__(SerializationType.JSON.value, topic, type)
+    def __init__(self, port,topic, type=MiddlewareType.CONSUMER):
+        super().__init__(port,SerializationType.JSON.value, topic, type)
 
     def push(self, value):
         """ Sends data to broker. """
@@ -114,8 +114,8 @@ class JSONQueue(Queue):
 
 
 class XMLQueue(Queue):
-    def __init__(self, topic, type=MiddlewareType.CONSUMER):
-        super().__init__(SerializationType.XML.value, topic, type)
+    def __init__(self,port, topic, type=MiddlewareType.CONSUMER):
+        super().__init__(port, SerializationType.XML.value, topic, type)
 
     def push(self, value):
         """ Sends data to broker. """
@@ -141,8 +141,8 @@ class XMLQueue(Queue):
 
 
 class PickleQueue(Queue):
-    def __init__(self, topic, type=MiddlewareType.CONSUMER):
-        super().__init__(SerializationType.PICKLE.value, topic, type)
+    def __init__(self,port, topic, type=MiddlewareType.CONSUMER):
+        super().__init__(port,SerializationType.PICKLE.value, topic, type)
 
     def push(self, value):
         """ Sends data to broker. """

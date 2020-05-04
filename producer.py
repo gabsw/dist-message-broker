@@ -20,18 +20,19 @@ text = ["Ó mar salgado, quanto do teu sal",
 
 
 class Producer:
-    def __init__(self, datatype):
+    def __init__(self, datatype,port,valuetype=None):
         self.type = datatype
+        self.valuetype=valuetype
         if datatype == "temp":
-            self.queue = [middleware.JSONQueue(f"/{self.type}", middleware.MiddlewareType.PRODUCER)]
+            self.queue = [middleware.JSONQueue(port,f"/{self.type}", middleware.MiddlewareType.PRODUCER)]
             self.gen = self._temp
         elif datatype == "msg":
-            self.queue = [middleware.JSONQueue(f"/{self.type}", middleware.MiddlewareType.PRODUCER)]
+            self.queue = [middleware.JSONQueue(port,f"/{self.type}", middleware.MiddlewareType.PRODUCER)]
             self.gen = self._msg
         elif datatype == "weather":
-            self.queue = [middleware.JSONQueue(f"/{self.type}/temperature", middleware.MiddlewareType.PRODUCER),
-                          middleware.JSONQueue(f"/{self.type}/humidity", middleware.MiddlewareType.PRODUCER),
-                          middleware.JSONQueue(f"/{self.type}/pressure", middleware.MiddlewareType.PRODUCER)]
+            self.queue = [middleware.JSONQueue(port,f"/{self.type}/temperature", middleware.MiddlewareType.PRODUCER),
+                          middleware.JSONQueue(port,f"/{self.type}/humidity", middleware.MiddlewareType.PRODUCER),
+                          middleware.JSONQueue(port,f"/{self.type}/pressure", middleware.MiddlewareType.PRODUCER)]
             self.gen = self._weather
 
     @classmethod
@@ -39,8 +40,19 @@ class Producer:
         return ["temp", "msg", "weather"]
 
     def _temp(self):
-        time.sleep(0.1)
-        yield random.randint(0, 40)
+        if self.valuetype is None:
+            time.sleep(0.1)
+            yield random.randint(0, 40)
+        elif self.valuetype is "even":
+            temp = random.randint(0, 40)
+            while temp % 2 != 0:
+                temp = random.randint(0, 40)
+            yield temp
+        elif self.valuetype is "odd":
+            temp = random.randint(0, 40)
+            while temp % 2 != 1:
+                temp = random.randint(0, 40)
+            yield temp
 
     def _msg(self):
         time.sleep(0.2)
@@ -58,6 +70,7 @@ class Producer:
         for _ in range(length):
             for queue, value in zip(self.queue, self.gen()):
                 queue.push(value)
+                print("data--->{}".format(value))
 
 
 if __name__ == "__main__":
@@ -70,6 +83,6 @@ if __name__ == "__main__":
         print("Error: not a valid producer type")
         sys.exit(1)
 
-    p = Producer(args.type)
+    p = Producer(args.type,"None")
 
     p.run(int(args.length))
