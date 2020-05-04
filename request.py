@@ -1,14 +1,14 @@
 class Request:
-    def __init__(self, operation, clock, id, message=None, broker=None):
+    def __init__(self, operation, clock, message_id, broker_id, message=None):
         self.operation = operation
         self.clock = clock
-        self.id = id
-        self.broker = broker
+        self.message_id = message_id
+        self.broker_id = broker_id
         self.message = message
 
     def __str__(self) -> str:
-        return f'Request(conn={self.broker}, operation={self.operation}, id={self.id}, clock={self.clock}, ' \
+        return f'Request(broker_id={self.broker_id}, operation={self.operation}, id={self.id}, clock={self.clock}, ' \
             f'message={self.message})'
 
     def __hash__(self):
-        return hash(self.broker.broker_id)
+        return hash(self.broker_id)

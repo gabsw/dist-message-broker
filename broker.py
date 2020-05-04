@@ -14,6 +14,7 @@ from utils import build_message, general_decode, general_encode, unpack_and_rece
     ConnectionClosedError, send_message_packed_with_size_to_another_broker, build_message_between_brokers, \
     send_to_all_brokers
 
+
 # TODO: Verificar se todos os clocks estão no lugar (por exemplo, ajustamos o clock a seguir a cada send?)
 class Broker:
     client_operations = (OperationType.SUBSCRIBE.value, OperationType.PUBLISH.value, OperationType.LIST.value,
@@ -29,12 +30,15 @@ class Broker:
         self.number_listeners = number_listeners
         self.trie = Trie()
         self.connections = {}  # conn -> ConnectionInfo
+
         self.clock = 0
-        self.request_queue = deque()
         self.serialization = SerializationType.JSON.value  # Default serialization
+
         self.brokers_dict = None  # conn
         self.broker_id = port
         self.brokers_ports = brokers_ports
+
+        self.request_queue = deque()
 
     def connect_to_brokers(self):
         print('Waiting for brokers.')
@@ -160,7 +164,7 @@ class Broker:
         elif operation == OperationType.ENTER.value:
             self.handle_enter(broker, message)
         elif operation == OperationType.RELEASE.value:
-            self.handle_release(broker, message)
+            self.handle_release(message)
         elif operation == OperationType.GREETING.value:
             self.handle_greeting(broker, message)
 
@@ -176,6 +180,7 @@ class Broker:
         topic_node.topic.add_subscriber(connection_info)
         connection_info.add_subscribed_topic(topic_node.topic)
 
+        # TODO: handle messages in other brokers
         last_message = topic_node.topic.last_message
         if last_message is not None:
             message_bytes = general_encode(connection_info.serialization, last_message)
@@ -211,9 +216,9 @@ class Broker:
         requester_clock = message["clock"]
         self.clock_adjustments(requester_clock)
 
-        request = Request(OperationType.ALLOW.value, requester_clock, message["id"], broker=broker)
-        self.request_queue.append(request)
+        request = Request(OperationType.ALLOW.value, requester_clock, message["message_id"], broker.id)
 
+        self.request_queue.append(request)
         self.sort_queue()
         if self.allowed_to_release():
             self.release()
@@ -222,27 +227,25 @@ class Broker:
         requester_clock = message["clock"]
         self.clock_adjustments(requester_clock)
 
-        request = Request(OperationType.ENTER.value, requester_clock, message["id"], message["content"], broker)
-        self.request_queue.append(request)
+        request = Request(OperationType.ENTER.value, requester_clock, message["message_id"], broker.id,
+                          message["content"])
 
-        self.allow_to_enter(broker.outgoing_conn, message["id"])
+        self.request_queue.append(request)
         self.sort_queue()
 
-    def handle_release(self, broker, message):
+        self.allow_to_enter(broker, message["message_id"])
+
+    def handle_release(self, message):
         requester_clock = message["clock"]
         self.clock_adjustments(requester_clock)
 
-        # TODO: Confirma se a mensagem que sai aqui é a correta
-        released_request = self.request_queue[0]
-        message_to_be_published = released_request["content"]
-
-        self.publish(message_to_be_published)
-        self.clean_up_queue(released_request.id)
+        if self.allowed_to_release():
+            self.release(send_release_message=False)
 
     @staticmethod
     def handle_greeting(broker, message):
         broker.greetings_ack = True
-        print(f"Received greetings from broker {broker.broker_id}: ")
+        print(f"Received greetings from broker {broker.id}: ")
         print(message)
 
     def clock_adjustments(self, requester_clock=0):
@@ -253,9 +256,9 @@ class Broker:
         sorted(self.request_queue, key=lambda request: request.clock)
 
     def clean_up_queue(self, message_id):
-        for request in self.request_queue:
-            if request.id == message_id:
-                self.request_queue.remove(request)
+        requests_to_remove = [request for request in self.request_queue if request.message_id == message_id]
+        for request in requests_to_remove:
+            self.request_queue.remove(request)
 
     def request_to_enter(self, topic_node, message):
         self.clock_adjustments()
@@ -266,46 +269,52 @@ class Broker:
         message_to_publish = build_message(serialization, OperationType.PUBLISH.value, topic_node.topic.path, content,
                                            timestamp)
 
-        request_message = build_message_between_brokers(OperationType.ENTER.value, self.clock, message_to_publish, self.broker_id)
-        request = Request(OperationType.ENTER.value, self.clock, request_message["id"], None, message_to_publish)
+        enter_message = build_message_between_brokers(OperationType.ENTER.value, self.clock, message_to_publish,
+                                                      self.broker_id)
+        request = Request(OperationType.ENTER.value, self.clock, enter_message["message_id"], self.broker_id,
+                          message_to_publish)
 
         self.request_queue.append(request)
         self.sort_queue()
-        send_to_all_brokers(self.brokers_dict.values(), request_message)
 
-    def allow_to_enter(self, broker, message_id):
-        self.clock = self.clock + 1
-        message = build_message_between_brokers(OperationType.ALLOW.value, self.clock, "", broker.broker_id, message_id)
-        message_bytes = general_encode(self.serialization, message)
-        send_message_packed_with_size_to_another_broker(broker, message_bytes)
-
-    def release(self):
-        self.clock = self.clock + 1
-        first_request = self.request_queue[0]
-
-        message = build_message_between_brokers(OperationType.RELEASE.value, self.clock, "", self.broker_id,
-                                                first_request.id)
-        message_bytes = general_encode(self.serialization, message)
+        message_bytes = general_encode(self.serialization, enter_message)
         send_to_all_brokers(self.brokers_dict.values(), message_bytes)
 
-        self.clean_up_queue(first_request.id)
+    def allow_to_enter(self, broker, message_id):
+        message = build_message_between_brokers(OperationType.ALLOW.value, self.clock, "", self.broker_id, message_id)
+        message_bytes = general_encode(self.serialization, message)
+
+        send_message_packed_with_size_to_another_broker(broker, message_bytes)
+
+    def release(self, send_release_message=True):
+        first_request = self.request_queue[0]
+
+        if send_release_message:
+            message = build_message_between_brokers(OperationType.RELEASE.value, self.clock, "", self.broker_id,
+                                                    first_request.message_id)
+            message_bytes = general_encode(self.serialization, message)
+            send_to_all_brokers(self.brokers_dict.values(), message_bytes)
+
+        self.publish(first_request.message)
+        self.clean_up_queue(first_request.message_id)
 
     def allowed_to_release(self):
         if self.request_queue:  # Check if it is not empty
             first_request = self.request_queue[0]
-
-            # Check if the first request corresponds to our broker
-            if first_request.broker == self.broker_id:
-                return False
-            first_request_id = first_request.id
+            first_request_message_id = first_request.message_id
             counter_allows_for_id = 0
 
-            # Check if the broker has received as many allow responses for a specific id
             for request in self.request_queue:
-                if request.operation == OperationType.ALLOW.value and request.id == first_request_id:
+                # This is for the broker that originated the message -- if n-1 allows for the first message exist,
+                # we can send it
+                if request.operation == OperationType.ALLOW.value and request.message_id == first_request_message_id:
                     counter_allows_for_id += 1
 
-            return len(self.brokers_dict) == len(counter_allows_for_id)
+                # This is for the other brokers -- if a release for the first message exist, we can send it
+                if request.operation == OperationType.RELEASE.value and request.message_id == first_request_message_id:
+                    return True
+
+            return len(self.brokers_dict) == counter_allows_for_id
         return False
 
     def publish(self, message):
