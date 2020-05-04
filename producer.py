@@ -71,6 +71,7 @@ class Producer:
             for queue, value in zip(self.queue, self.gen()):
                 queue.push(value)
                 print("data--->{}".format(value))
+                time.sleep(0.1)
 
 
 if __name__ == "__main__":

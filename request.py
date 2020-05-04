@@ -6,8 +6,8 @@ class Request:
         self.broker_id = broker_id
         self.message = message
 
-    def __str__(self) -> str:
-        return f'Request(broker_id={self.broker_id}, operation={self.operation}, id={self.id}, clock={self.clock}, ' \
+    def __str__(self):
+        return f'Request(broker_id={self.broker_id}, operation={self.operation}, message_id={self.message_id}, clock={self.clock}, ' \
             f'message={self.message})'
 
     def __hash__(self):

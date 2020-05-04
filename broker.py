@@ -38,7 +38,7 @@ class Broker:
         self.broker_id = port
         self.brokers_ports = brokers_ports
 
-        self.request_queue = deque()
+        self.request_queue = []
 
     def connect_to_brokers(self):
         print('Waiting for brokers.')
@@ -137,6 +137,8 @@ class Broker:
         return topic_node
 
     def handle_client_message(self, conn, message):
+        self.clock_adjustments()
+
         topic_path = message["topic"]
         operation = message["operation"]
         if operation not in self.client_operations:
@@ -164,7 +166,7 @@ class Broker:
         elif operation == OperationType.ENTER.value:
             self.handle_enter(broker, message)
         elif operation == OperationType.RELEASE.value:
-            self.handle_release(message)
+            self.handle_release(broker,message)
         elif operation == OperationType.GREETING.value:
             self.handle_greeting(broker, message)
 
@@ -194,6 +196,7 @@ class Broker:
             nodes = "No topics yet"
         message = build_message(serialization, OperationType.LIST.value, None, nodes)
         message_bytes = general_encode(serialization, message)
+
         connection_info.send(message_bytes)
 
     def handle_cancel(self, conn, topic_node):
@@ -235,9 +238,15 @@ class Broker:
 
         self.allow_to_enter(broker, message["message_id"])
 
-    def handle_release(self, message):
+    def handle_release(self, broker,message):
         requester_clock = message["clock"]
         self.clock_adjustments(requester_clock)
+
+        request = Request(OperationType.RELEASE.value, requester_clock, message["message_id"], broker.id,
+                          message["content"])
+
+        self.request_queue.append(request)
+        self.sort_queue()
 
         if self.allowed_to_release():
             self.release(send_release_message=False)
@@ -253,7 +262,8 @@ class Broker:
         self.clock = self.clock + 1
 
     def sort_queue(self):
-        sorted(self.request_queue, key=lambda request: request.clock)
+        #    sort(self.request_queue, key=lambda request: request.clock)
+        self.request_queue.sort(key=lambda request: (request.clock,request.broker_id))
 
     def clean_up_queue(self, message_id):
         requests_to_remove = [request for request in self.request_queue if request.message_id == message_id]
@@ -281,12 +291,14 @@ class Broker:
         send_to_all_brokers(self.brokers_dict.values(), message_bytes)
 
     def allow_to_enter(self, broker, message_id):
+        self.clock_adjustments()
         message = build_message_between_brokers(OperationType.ALLOW.value, self.clock, "", self.broker_id, message_id)
         message_bytes = general_encode(self.serialization, message)
 
         send_message_packed_with_size_to_another_broker(broker, message_bytes)
 
     def release(self, send_release_message=True):
+        self.clock_adjustments()
         first_request = self.request_queue[0]
 
         if send_release_message:
@@ -294,7 +306,7 @@ class Broker:
                                                     first_request.message_id)
             message_bytes = general_encode(self.serialization, message)
             send_to_all_brokers(self.brokers_dict.values(), message_bytes)
-
+        print(send_release_message)
         self.publish(first_request.message)
         self.clean_up_queue(first_request.message_id)
 
