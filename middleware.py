@@ -5,7 +5,7 @@ from utils import build_message, general_encode, general_decode, SerializationTy
     unpack_and_receive_message_bytes, ConnectionClosedError
 
 HOST = 'localhost'
-PORT = 8000
+PORT = 8500
 
 
 class MiddlewareType(Enum):

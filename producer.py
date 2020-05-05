@@ -20,20 +20,21 @@ text = ["Ó mar salgado, quanto do teu sal",
 
 
 class Producer:
-    def __init__(self, datatype,port,valuetype=None):
+    def __init__(self, datatype, port, valuetype=None):
         self.type = datatype
-        self.valuetype=valuetype
+        self.valuetype = valuetype
         if datatype == "temp":
-            self.queue = [middleware.JSONQueue(port,f"/{self.type}", middleware.MiddlewareType.PRODUCER)]
+            self.queue = [middleware.JSONQueue(port, f"/{self.type}", middleware.MiddlewareType.PRODUCER)]
             self.gen = self._temp
         elif datatype == "msg":
-            self.queue = [middleware.JSONQueue(port,f"/{self.type}", middleware.MiddlewareType.PRODUCER)]
+            self.queue = [middleware.JSONQueue(port, f"/{self.type}", middleware.MiddlewareType.PRODUCER)]
             self.gen = self._msg
         elif datatype == "weather":
-            self.queue = [middleware.JSONQueue(port,f"/{self.type}/temperature", middleware.MiddlewareType.PRODUCER),
-                          middleware.JSONQueue(port,f"/{self.type}/humidity", middleware.MiddlewareType.PRODUCER),
-                          middleware.JSONQueue(port,f"/{self.type}/pressure", middleware.MiddlewareType.PRODUCER)]
+            self.queue = [middleware.JSONQueue(port, f"/{self.type}/temperature", middleware.MiddlewareType.PRODUCER),
+                          middleware.JSONQueue(port, f"/{self.type}/humidity", middleware.MiddlewareType.PRODUCER),
+                          middleware.JSONQueue(port, f"/{self.type}/pressure", middleware.MiddlewareType.PRODUCER)]
             self.gen = self._weather
+        self.port = port
 
     @classmethod
     def datatypes(self):
@@ -70,7 +71,7 @@ class Producer:
         for _ in range(length):
             for queue, value in zip(self.queue, self.gen()):
                 queue.push(value)
-                print("data--->{}".format(value))
+                print(f'port {self.port} data {value}')
                 time.sleep(0.1)
 
 
@@ -84,6 +85,6 @@ if __name__ == "__main__":
         print("Error: not a valid producer type")
         sys.exit(1)
 
-    p = Producer(args.type,"None")
+    p = Producer(args.type, "None")
 
     p.run(int(args.length))

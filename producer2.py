@@ -13,6 +13,6 @@ if __name__ == "__main__":
         print("Error: not a valid producer type")
         sys.exit(1)
 
-    p = Producer(args.type,PORT+1,"odd")
+    p = Producer(args.type, PORT + 1, "odd")
 
     p.run(int(args.length))

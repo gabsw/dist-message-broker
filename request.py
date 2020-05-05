@@ -7,8 +7,11 @@ class Request:
         self.message = message
 
     def __str__(self):
-        return f'Request(broker_id={self.broker_id}, operation={self.operation}, message_id={self.message_id}, clock={self.clock}, ' \
-            f'message={self.message})'
+        return f'Request(broker_id={self.broker_id}, operation={self.operation}, message_id={self.message_id},' \
+            f' clock={self.clock}, data={self.message["content"] if self.message else None}'
+
+    def __repr__(self):
+        return str(self)
 
     def __hash__(self):
         return hash(self.broker_id)
