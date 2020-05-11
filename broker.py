@@ -3,7 +3,7 @@ import selectors
 import socket
 import struct
 import time
-from collections import deque
+
 
 from connection_info import ConnectionInfo
 from middleware import OperationType, SerializationType, ExternalBroker
@@ -15,7 +15,6 @@ from utils import build_message, general_decode, general_encode, unpack_and_rece
     send_to_all_brokers
 
 
-# TODO: Verificar se todos os clocks estão no lugar (por exemplo, ajustamos o clock a seguir a cada send?)
 class Broker:
     client_operations = (OperationType.SUBSCRIBE.value, OperationType.PUBLISH.value, OperationType.LIST.value,
                          OperationType.CANCEL.value)
